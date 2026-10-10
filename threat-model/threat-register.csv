@@ -1,0 +1,7 @@
+Threat_ID,STRIDE_Category,Component,Threat,Impact,Initial_Priority,Mitigation,Status
+S-001,Spoofing,Backend API,Forged authentication token,Unauthorized access,High,Validate token signature and claims,To Validate
+T-001,Tampering,Backend API,Unauthorized account modification,Data integrity loss,High,Enforce object-level authorization,To Validate
+R-001,Repudiation,Audit Logging,Insufficient audit evidence,Reduced accountability,Medium,Implement protected audit logging,To Validate
+I-001,Information Disclosure,Backend API,Cross-user account data exposure,Confidentiality loss,High,Enforce server-side ownership checks; validated with tests/test_bola.py,Mitigated - Regression tests passed
+D-001,Denial of Service,Backend API,Excessive requests exhaust resources,Service disruption,High,Apply rate limits and resource limits,To Validate
+E-001,Elevation of Privilege,Backend API,Regular user performs privileged actions,Unauthorized administrative access,High,Enforce server-side permission checks,To Validate

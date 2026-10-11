@@ -251,3 +251,15 @@ def test_post_to_get_only_account_endpoint_is_rejected():
     )
 
     assert response.status_code == 405
+
+
+def test_unknown_account_returns_404():
+    token = create_token("user-a")
+
+    response = app.test_client().get(
+        "/api/accounts/999",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 404
+    assert response.get_json()["error"] == "Account not found"

@@ -58,6 +58,27 @@ def create_token(username, lifetime=timedelta(minutes=5)):
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
+def require_role(required_role):
+    """Require the authenticated user to have a specific role."""
+    def decorator(handler):
+        @wraps(handler)
+        def wrapper(*args, **kwargs):
+            username = getattr(request, "authenticated_user", None)
+            user = USERS.get(username)
+            if not user or user.get("role") != required_role:
+                audit_event(
+                    "authorization_denied",
+                    "failure",
+                    username=username if isinstance(username, str) else "unknown",
+                    required_role=required_role,
+                    path=request.path,
+                )
+                return jsonify({"error": "Forbidden"}), 403
+            return handler(*args, **kwargs)
+        return wrapper
+    return decorator
+
+
 def require_authentication(handler):
     @wraps(handler)
     def wrapper(*args, **kwargs):
@@ -141,6 +162,14 @@ def get_account(account_id):
         "owner": account["owner"],
         "balance": account["balance"],
     }), 200
+
+
+@app.route("/api/admin/health", methods=["GET"])
+@limiter.limit("30 per minute")
+@require_authentication
+@require_role("admin")
+def admin_health():
+    return jsonify({"status": "ok"}), 200
 
 
 if __name__ == "__main__":

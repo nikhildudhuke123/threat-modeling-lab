@@ -460,3 +460,39 @@ def test_account_rate_limit_returns_429():
 
     response = client.get("/api/accounts/101", headers=headers)
     assert response.status_code == 429
+
+
+def test_regular_user_cannot_access_admin_endpoint():
+    client = app.test_client()
+    token = create_token("user-a")
+
+    response = client.get(
+        "/api/admin/health",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 403
+
+
+def test_admin_role_can_access_admin_endpoint(monkeypatch):
+    from app import USERS
+
+    monkeypatch.setitem(USERS, "user-a", {
+        "password_hash": USERS["user-a"]["password_hash"],
+        "role": "admin",
+    })
+    client = app.test_client()
+    token = create_token("user-a")
+
+    response = client.get(
+        "/api/admin/health",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.get_json() == {"status": "ok"}
+
+
+def test_admin_endpoint_rejects_missing_token():
+    response = app.test_client().get("/api/admin/health")
+    assert response.status_code == 401

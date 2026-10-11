@@ -195,7 +195,7 @@ trivy fs --scanners vuln --detection-priority comprehensive .
 gitleaks detect --source . --redact --verbose
 ```
 
-Latest locally reported results: 34 tests passed, Semgrep reported zero findings across 151 rules, Trivy detected zero dependency vulnerabilities in `requirements.txt`, and Gitleaks reported no leaks. These results are scoped to the configured tools and scans; they do not prove the absence of all vulnerabilities.
+Latest locally reported results: 35 tests passed, Semgrep reported zero findings across 151 rules, Trivy detected zero dependency vulnerabilities in `requirements.txt`, and Gitleaks reported no leaks. These results are scoped to the configured tools and scans; they do not prove the absence of all vulnerabilities.
 
 [View GitHub Actions](https://github.com/nikhildudhuke123/threat-modeling-lab/actions)
 

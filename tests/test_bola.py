@@ -523,3 +523,23 @@ def test_account_endpoint_rejects_put_and_patch_methods():
             json={"balance": 999999},
         )
         assert response.status_code == 405
+
+
+def test_admin_rate_limit_returns_429(monkeypatch):
+    from app import USERS
+
+    monkeypatch.setitem(USERS, "user-a", {
+        "password_hash": USERS["user-a"]["password_hash"],
+        "role": "admin",
+    })
+
+    client = app.test_client()
+    token = create_token("user-a")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    for _ in range(30):
+        response = client.get("/api/admin/health", headers=headers)
+        assert response.status_code == 200
+
+    response = client.get("/api/admin/health", headers=headers)
+    assert response.status_code == 429

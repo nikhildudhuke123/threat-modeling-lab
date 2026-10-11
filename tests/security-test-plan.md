@@ -55,7 +55,7 @@ Run the suite:
 |---|---|---|---|
 | SEC-08 / D-001: Login rate limiting | `test_login_rate_limit_returns_429` | Requests exceeding the configured limit receive HTTP 429 | Distributed-client abuse and broader resource-exhaustion testing |
 | D-001: Account rate limiting | `test_account_rate_limit_returns_429` | Requests exceeding the configured limit receive HTTP 429 | Multi-worker shared storage and production behavior |
-| D-001: Admin endpoint rate limiting | No dedicated rate-limit test identified in the current test inventory | Configured limit is 30 requests per minute per client IP | Add a dedicated regression test |
+| D-001: Admin endpoint rate limiting | `test_admin_rate_limit_returns_429` | The 31st request within the configured limit window receives HTTP 429 after 30 successful requests | Distributed-client abuse and production shared-storage behavior remain unverified |
 | D-001: Other resource limits | No evidence identified for request-size limits, timeouts, or resource quotas | Not established by the current test suite | Assess and implement appropriate controls where needed |
 
 ## 7. Security Tooling and CI
@@ -86,4 +86,4 @@ For each test run:
    `threat-model/threat-test-traceability.md`, and related requirement statuses.
 5. Do not label a control fully mitigated based only on a narrow regression test.
 
-Last previously recorded local suite result: 34 tests passed. Rerun the suite before using that result as evidence for a newer commit.
+Latest verified local suite result: 35 tests passed. Rerun the suite before using that result as evidence for a newer commit.

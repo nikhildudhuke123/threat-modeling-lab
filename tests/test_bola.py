@@ -163,3 +163,49 @@ def test_login_rejects_non_object_json():
         response = client.post("/api/login", json=payload)
 
         assert response.status_code == 401
+
+
+def test_token_with_wrong_issuer_is_rejected():
+    now = datetime.now(timezone.utc)
+
+    token = jwt.encode(
+        {
+            "sub": "user-a",
+            "iat": now,
+            "exp": now + timedelta(minutes=5),
+            "iss": "untrusted-issuer",
+            "aud": "securebank-api",
+        },
+        JWT_SECRET,
+        algorithm=JWT_ALGORITHM,
+    )
+
+    response = app.test_client().get(
+        "/api/accounts/101",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 401
+
+
+def test_token_with_wrong_audience_is_rejected():
+    now = datetime.now(timezone.utc)
+
+    token = jwt.encode(
+        {
+            "sub": "user-a",
+            "iat": now,
+            "exp": now + timedelta(minutes=5),
+            "iss": "securebank-lab",
+            "aud": "different-api",
+        },
+        JWT_SECRET,
+        algorithm=JWT_ALGORITHM,
+    )
+
+    response = app.test_client().get(
+        "/api/accounts/101",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 401

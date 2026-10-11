@@ -209,3 +209,33 @@ def test_token_with_wrong_audience_is_rejected():
     )
 
     assert response.status_code == 401
+
+
+def test_empty_bearer_token_is_rejected():
+    response = app.test_client().get(
+        "/api/accounts/101",
+        headers={"Authorization": "Bearer "},
+    )
+
+    assert response.status_code == 401
+
+
+def test_basic_auth_scheme_is_rejected():
+    response = app.test_client().get(
+        "/api/accounts/101",
+        headers={"Authorization": "Basic dXNlcjpwYXNz"},
+    )
+
+    assert response.status_code == 401
+
+
+def test_malformed_authorization_header_is_rejected():
+    client = app.test_client()
+
+    for header in ["invalid-header", "Bearer", "Bearer token extra"]:
+        response = client.get(
+            "/api/accounts/101",
+            headers={"Authorization": header},
+        )
+
+        assert response.status_code == 401

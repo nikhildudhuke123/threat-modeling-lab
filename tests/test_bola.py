@@ -1,8 +1,14 @@
+import os
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import jwt
+from werkzeug.security import generate_password_hash
+
+# Test-only credentials; never use these in a deployed environment.
+os.environ["USER_A_PASSWORD_HASH"] = generate_password_hash("LabPass-A-Only")
+os.environ["USER_B_PASSWORD_HASH"] = generate_password_hash("LabPass-B-Only")
 
 sys.path.insert(
     0, str(Path(__file__).resolve().parents[1] / "application")

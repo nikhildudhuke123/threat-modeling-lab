@@ -4,7 +4,7 @@ from functools import wraps
 
 import jwt
 from flask import Flask, jsonify, request
-from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.security import check_password_hash
 
 app = Flask(__name__)
 
@@ -14,19 +14,19 @@ JWT_ALGORITHM = "HS256"
 if not JWT_SECRET:
     raise RuntimeError("JWT_SECRET environment variable is required")
 
-# Fictional users for this local security lab.
-# Production applications must use securely stored password hashes.
-# Fictional lab users. Passwords are stored as Werkzeug-generated hashes.
-# These deterministic demo passwords are for local testing only.
+# Load precomputed password hashes from the runtime environment.
+# Provision hashes securely; never store plaintext passwords in application code.
+USER_A_PASSWORD_HASH = os.environ.get("USER_A_PASSWORD_HASH")
+USER_B_PASSWORD_HASH = os.environ.get("USER_B_PASSWORD_HASH")
+
+if not USER_A_PASSWORD_HASH or not USER_B_PASSWORD_HASH:
+    raise RuntimeError(
+        "USER_A_PASSWORD_HASH and USER_B_PASSWORD_HASH environment variables are required"
+    )
+
 USERS = {
-    "user-a": {
-        "password_hash": generate_password_hash("LabPass-A-Only"),
-        "role": "user",
-    },
-    "user-b": {
-        "password_hash": generate_password_hash("LabPass-B-Only"),
-        "role": "user",
-    },
+    "user-a": {"password_hash": USER_A_PASSWORD_HASH, "role": "user"},
+    "user-b": {"password_hash": USER_B_PASSWORD_HASH, "role": "user"},
 }
 
 ACCOUNTS = {

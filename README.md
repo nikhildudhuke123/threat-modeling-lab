@@ -133,18 +133,39 @@ storage and appropriate key rotation.
 pytest -v
 ```
 
-The current local test suite contains seven tests covering successful
-own-account access, cross-account access denial, missing and tampered
-tokens, expired tokens, successful login, and invalid login.
+The local regression suite contains 13 tests covering BOLA
+authorization, JWT validation, password-hash storage, successful and failed
+login, and malformed login inputs.
 
-### 6. Run the demo API
+### 6. Configure demo credentials and run the API
+
+The app requires `JWT_SECRET`, `USER_A_PASSWORD_HASH`, and
+`USER_B_PASSWORD_HASH`. Generate local demo password hashes without
+storing plaintext passwords or hashes in the repository:
+
+```bash
+export USER_A_PASSWORD_HASH="$(python -c 'import getpass; from werkzeug.security import generate_password_hash; print(generate_password_hash(getpass.getpass("Password for user-a: ")))' )"
+export USER_B_PASSWORD_HASH="$(python -c 'import getpass; from werkzeug.security import generate_password_hash; print(generate_password_hash(getpass.getpass("Password for user-b: ")))' )"
+```
+
+Enter a password when prompted for each user. `getpass` hides
+password input in the terminal. These commands set environment variables
+for the current shell; do not commit their values or share them.
+
+Generate a JWT signing key for the current shell:
+
+```bash
+export JWT_SECRET="$(python -c 'import secrets; print(secrets.token_hex(32))')"
+```
+
+Start the local demo API:
 
 ```bash
 python application/app.py
 ```
 
-The application is configured to bind to localhost. Review
-`application/app.py` for the lab's sample users and API behavior.
+The API binds to `127.0.0.1`. These are local lab credentials, not
+a production identity system. Do not commit generated hashes or secrets.
 
 ## Automated Security Checks
 

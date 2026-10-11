@@ -4,6 +4,7 @@ from functools import wraps
 
 import jwt
 from flask import Flask, jsonify, request
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 
@@ -15,9 +16,17 @@ if not JWT_SECRET:
 
 # Fictional users for this local security lab.
 # Production applications must use securely stored password hashes.
+# Fictional lab users. Passwords are stored as Werkzeug-generated hashes.
+# These deterministic demo passwords are for local testing only.
 USERS = {
-    "user-a": {"password": "LabPass-A-Only", "role": "user"},
-    "user-b": {"password": "LabPass-B-Only", "role": "user"},
+    "user-a": {
+        "password_hash": generate_password_hash("LabPass-A-Only"),
+        "role": "user",
+    },
+    "user-b": {
+        "password_hash": generate_password_hash("LabPass-B-Only"),
+        "role": "user",
+    },
 }
 
 ACCOUNTS = {
@@ -74,13 +83,20 @@ def require_authentication(handler):
 
 @app.route("/api/login", methods=["POST"])
 def login():
-    data = request.get_json(silent=True) or {}
+    data = request.get_json(silent=True)
+
+    if not isinstance(data, dict):
+        return jsonify({"error": "Invalid credentials"}), 401
+
     username = data.get("username")
     password = data.get("password")
 
+    if not isinstance(username, str) or not isinstance(password, str):
+        return jsonify({"error": "Invalid credentials"}), 401
+
     user = USERS.get(username)
 
-    if not user or password != user["password"]:
+    if not user or not check_password_hash(user["password_hash"], password):
         return jsonify({"error": "Invalid credentials"}), 401
 
     return jsonify({"access_token": create_token(username)}), 200

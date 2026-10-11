@@ -98,3 +98,62 @@ def test_invalid_login_is_rejected():
     )
 
     assert response.status_code == 401
+
+
+def test_users_store_password_hashes_not_plaintext_passwords():
+    from app import USERS
+
+    for user in USERS.values():
+        assert "password_hash" in user
+        assert "password" not in user
+
+
+def test_login_rejects_missing_password():
+    response = app.test_client().post(
+        "/api/login",
+        json={"username": "user-a"},
+    )
+
+    assert response.status_code == 401
+
+
+def test_login_rejects_null_password():
+    response = app.test_client().post(
+        "/api/login",
+        json={"username": "user-a", "password": None},
+    )
+
+    assert response.status_code == 401
+
+
+def test_login_rejects_non_string_password():
+    client = app.test_client()
+
+    for password in [12345, ["LabPass-A-Only"], {"value": "LabPass-A-Only"}]:
+        response = client.post(
+            "/api/login",
+            json={"username": "user-a", "password": password},
+        )
+
+        assert response.status_code == 401
+
+
+def test_login_rejects_non_string_usernames():
+    client = app.test_client()
+
+    for username in [None, 123, ["user-a"], {"name": "user-a"}]:
+        response = client.post(
+            "/api/login",
+            json={"username": username, "password": "LabPass-A-Only"},
+        )
+
+        assert response.status_code == 401
+
+
+def test_login_rejects_non_object_json():
+    client = app.test_client()
+
+    for payload in [[], "user-a", 123, None]:
+        response = client.post("/api/login", json=payload)
+
+        assert response.status_code == 401

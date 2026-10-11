@@ -12,3 +12,6 @@ __pycache__/
 # Editor and OS files
 .vscode/
 .DS_Store
+
+# Local audit records (never commit generated logs)
+logs/

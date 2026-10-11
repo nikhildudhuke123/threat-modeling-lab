@@ -284,7 +284,7 @@ def test_successful_login_is_audited_without_credentials(caplog):
     assert any(
         record["event"] == "login_attempt"
         and record["outcome"] == "success"
-        and record["username"] == "user-a"
+        and record["details"]["username"] == "user-a"
         for record in records
     )
     logged_text = "\n".join(record.message for record in caplog.records)
@@ -311,7 +311,7 @@ def test_failed_login_is_audited(caplog):
     assert any(
         record["event"] == "login_attempt"
         and record["outcome"] == "failure"
-        and record["username"] == "user-a"
+        and record["details"]["username"] == "user-a"
         for record in records
     )
     assert "wrong-password" not in "\n".join(
@@ -339,8 +339,8 @@ def test_cross_account_access_is_audited(caplog):
     assert any(
         record["event"] == "account_access"
         and record["outcome"] == "denied"
-        and record["username"] == "user-a"
-        and record["account_id"] == 202
+        and record["details"]["username"] == "user-a"
+        and record["details"]["account_id"] == 202
         for record in records
     )
     assert token not in "\n".join(
@@ -364,6 +364,57 @@ def test_missing_token_rejection_is_audited(caplog):
     assert any(
         record["event"] == "authentication_rejected"
         and record["outcome"] == "failure"
-        and record["path"] == "/api/accounts/101"
+        and record["details"]["path"] == "/api/accounts/101"
         for record in records
     )
+
+
+def test_audit_event_persists_and_hash_chain_verifies(tmp_path, monkeypatch):
+    import json
+    import audit
+
+    monkeypatch.setattr(audit, "_LOG_DIR", tmp_path)
+    monkeypatch.setattr(audit, "_LOG_FILE", tmp_path / "audit.log")
+
+    audit.audit_event("test_event", "success", username="user-a")
+    audit.audit_event("test_event", "failure", username="user-b")
+
+    records = [
+        json.loads(line)
+        for line in (tmp_path / "audit.log").read_text().splitlines()
+    ]
+    assert len(records) == 2
+    assert records[0]["event"] == "test_event"
+    assert records[0]["details"]["username"] == "user-a"
+    assert records[1]["previous_hash"] == records[0]["record_hash"]
+    assert audit.verify_audit_log(tmp_path / "audit.log")
+
+
+def test_audit_log_tampering_is_detected(tmp_path, monkeypatch):
+    import json
+    import audit
+
+    monkeypatch.setattr(audit, "_LOG_DIR", tmp_path)
+    monkeypatch.setattr(audit, "_LOG_FILE", tmp_path / "audit.log")
+
+    audit.audit_event("test_event", "success", username="user-a")
+    log_path = tmp_path / "audit.log"
+    record = json.loads(log_path.read_text().splitlines()[0])
+    record["details"]["username"] = "user-b"
+    log_path.write_text(json.dumps(record) + "\n")
+
+    assert not audit.verify_audit_log(log_path)
+
+
+def test_audit_log_file_has_restrictive_permissions(tmp_path, monkeypatch):
+    import os
+    import stat
+    import audit
+
+    monkeypatch.setattr(audit, "_LOG_DIR", tmp_path / "audit")
+    monkeypatch.setattr(audit, "_LOG_FILE", tmp_path / "audit" / "audit.log")
+
+    audit.audit_event("test_event", "success", username="user-a")
+
+    mode = stat.S_IMODE(os.stat(tmp_path / "audit" / "audit.log").st_mode)
+    assert mode == 0o600

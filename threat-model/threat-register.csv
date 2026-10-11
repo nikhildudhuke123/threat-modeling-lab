@@ -1,7 +1,7 @@
 Threat_ID,STRIDE_Category,Component,Threat,Impact,Initial_Priority,Mitigation,Status
-S-001,Spoofing,Backend API,Forged authentication token,Unauthorized access,High,Validate token signature and claims,To Validate
-T-001,Tampering,Backend API,Unauthorized account modification,Data integrity loss,High,Enforce object-level authorization,To Validate
-R-001,Repudiation,Audit Logging,Insufficient audit evidence,Reduced accountability,Medium,Implement protected audit logging,To Validate
-I-001,Information Disclosure,Backend API,Cross-user account data exposure,Confidentiality loss,High,Enforce server-side ownership checks; validated with tests/test_bola.py,Mitigated - Regression tests passed
-D-001,Denial of Service,Backend API,Excessive requests exhaust resources,Service disruption,High,Apply rate limits and resource limits,To Validate
-E-001,Elevation of Privilege,Backend API,Regular user performs privileged actions,Unauthorized administrative access,High,Enforce server-side permission checks,To Validate
+S-001,Spoofing,Backend API,Forged authentication token,Unauthorized access,High,"Validate JWT signature, expiry, issuer, and audience; evidence: tests/test_bola.py (tampered, expired, wrong-issuer, wrong-audience token tests)",Partially validated - JWT rejection tests passed; broader spoofing controls not assessed
+T-001,Tampering,Backend API,Unauthorized account modification,Data integrity loss,High,Enforce object-level authorization and reject unsupported methods; evidence: tests/test_bola.py (cross-account access and POST rejection tests),To Validate - no account-modification endpoint or mutation tests
+R-001,Repudiation,Audit Logging,Insufficient audit evidence,Reduced accountability,Medium,Implement protected audit logging and test log integrity and event coverage,To Validate - audit logging not implemented or tested
+I-001,Information Disclosure,Backend API,Cross-user account data exposure,Confidentiality loss,High,"Enforce server-side ownership checks; evidence: tests/test_bola.py and manual live API checks (own account 200, cross-account 403)",Mitigated in tested scenarios - regression tests passed
+D-001,Denial of Service,Backend API,Excessive requests exhaust resources,Service disruption,High,Apply rate limits and resource limits; add availability tests,To Validate - rate limiting and resource exhaustion not tested
+E-001,Elevation of Privilege,Backend API,Regular user performs privileged actions,Unauthorized administrative access,High,Enforce server-side permission checks for privileged operations; add role authorization tests,To Validate - privileged operations and role authorization not tested

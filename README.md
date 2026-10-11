@@ -133,9 +133,10 @@ storage and appropriate key rotation.
 pytest -v
 ```
 
-The local regression suite contains 13 tests covering BOLA
-authorization, JWT validation, password-hash storage, successful and failed
-login, and malformed login inputs.
+The local regression suite contains 20 tests covering BOLA authorization,
+JWT validation, password-hash storage, successful and failed login,
+malformed login inputs and Authorization headers, unsupported HTTP methods,
+and unknown-account handling.
 
 ### 6. Configure demo credentials and run the API
 

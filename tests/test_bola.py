@@ -496,3 +496,30 @@ def test_admin_role_can_access_admin_endpoint(monkeypatch):
 def test_admin_endpoint_rejects_missing_token():
     response = app.test_client().get("/api/admin/health")
     assert response.status_code == 401
+
+
+def test_account_endpoint_rejects_post_method():
+    client = app.test_client()
+    token = create_token("user-a")
+
+    response = client.post(
+        "/api/accounts/101",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"balance": 999999},
+    )
+
+    assert response.status_code == 405
+
+
+def test_account_endpoint_rejects_put_and_patch_methods():
+    client = app.test_client()
+    token = create_token("user-a")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    for method in ("put", "patch", "delete"):
+        response = getattr(client, method)(
+            "/api/accounts/101",
+            headers=headers,
+            json={"balance": 999999},
+        )
+        assert response.status_code == 405

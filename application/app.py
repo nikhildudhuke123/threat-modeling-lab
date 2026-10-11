@@ -4,10 +4,18 @@ from functools import wraps
 
 import jwt
 from flask import Flask, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash
 from audit import audit_event
 
 app = Flask(__name__)
+app.config['RATELIMIT_STORAGE_URI'] = 'memory://'
+limiter = Limiter(
+    key_func=get_remote_address,
+    app=app,
+    default_limits=[],
+)
 
 JWT_SECRET = os.environ.get("JWT_SECRET")
 JWT_ALGORITHM = "HS256"
@@ -86,6 +94,7 @@ def require_authentication(handler):
 
 
 @app.route("/api/login", methods=["POST"])
+@limiter.limit("5 per minute")
 def login():
     data = request.get_json(silent=True)
 
@@ -111,6 +120,7 @@ def login():
 
 
 @app.route("/api/accounts/<int:account_id>", methods=["GET"])
+@limiter.limit("30 per minute")
 @require_authentication
 def get_account(account_id):
     username = request.authenticated_user

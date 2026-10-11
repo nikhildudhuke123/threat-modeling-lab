@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import jwt
+import pytest
 from werkzeug.security import generate_password_hash
 
 # Test-only credentials; never use these in a deployed environment.
@@ -15,6 +16,16 @@ sys.path.insert(
 )
 
 from app import app, create_token, JWT_SECRET, JWT_ALGORITHM
+
+@pytest.fixture(autouse=True)
+def reset_rate_limits():
+    """Keep rate-limit state isolated between tests."""
+    for limiter in app.extensions["limiter"]:
+        limiter._storage.reset()
+    yield
+    for limiter in app.extensions["limiter"]:
+        limiter._storage.reset()
+
 
 
 def test_user_can_access_own_account():
@@ -418,3 +429,34 @@ def test_audit_log_file_has_restrictive_permissions(tmp_path, monkeypatch):
 
     mode = stat.S_IMODE(os.stat(tmp_path / "audit" / "audit.log").st_mode)
     assert mode == 0o600
+
+
+def test_login_rate_limit_returns_429():
+    from app import limiter
+
+    client = app.test_client()
+    for _ in range(5):
+        response = client.post(
+            "/api/login",
+            json={"username": "user-a", "password": "wrong-password"},
+        )
+        assert response.status_code == 401
+
+    response = client.post(
+        "/api/login",
+        json={"username": "user-a", "password": "wrong-password"},
+    )
+    assert response.status_code == 429
+
+
+def test_account_rate_limit_returns_429():
+    client = app.test_client()
+    token = create_token("user-a")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    for _ in range(30):
+        response = client.get("/api/accounts/101", headers=headers)
+        assert response.status_code == 200
+
+    response = client.get("/api/accounts/101", headers=headers)
+    assert response.status_code == 429

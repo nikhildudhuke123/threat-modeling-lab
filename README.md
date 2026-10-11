@@ -1,84 +1,104 @@
 # Threat Modeling Lab — SecureBank API
 
-A hands-on application security project demonstrating threat modeling,
-STRIDE analysis, Broken Object Level Authorization (BOLA) remediation,
-JWT authentication, security regression testing, and automated security
-checks with GitHub Actions.
+A hands-on application security project demonstrating STRIDE threat modeling, BOLA/IDOR prevention, JWT authentication, role-based authorization, audit logging, API rate limiting, security regression testing, and automated security checks with GitHub Actions.
 
-> **Lab only:** SecureBank is a deliberately simplified demonstration
-> application. It is not intended for production use.
+> **Lab only:** SecureBank is a deliberately simplified educational application, not a production banking service.
 
 ## Project Objectives
 
 - Document system boundaries, components, and data flows.
-- Identify threats using the STRIDE methodology.
-- Maintain a threat register with remediation actions.
-- Demonstrate and remediate a BOLA / IDOR-style authorization flaw.
-- Implement JWT authentication and token validation controls.
-- Verify security controls with automated regression tests.
-- Integrate SAST, dependency, configuration, and secret scanning into CI.
+- Identify threats using STRIDE and maintain a traceable threat register.
+- Enforce account ownership checks to prevent BOLA/IDOR.
+- Validate JWT signatures, expiry, issuer, and audience.
+- Demonstrate role-based authorization for an example admin endpoint.
+- Apply API rate limits and test HTTP 429 responses.
+- Persist structured audit events and verify log hash-chain integrity.
+- Run regression tests and security scanners locally and in CI.
+- Document residual risks instead of claiming unverified mitigations.
 
 ## Architecture
 
 ```mermaid
 flowchart TD
-    U[API Client] -->|Credentials| A[Flask Login API]
-    A -->|JWT Access Token| U
-    U -->|Bearer Token + Account ID| B[Account API]
-    B --> C[JWT Validation]
-    C --> D{Authenticated?}
-    D -->|No| E[401 Unauthorized]
-    D -->|Yes| F{Owns Account?}
-    F -->|No| G[403 Forbidden]
-    F -->|Yes| H[Return Account Data]
+    U[API Client] -->|Credentials| L[Flask Login API]
+    L -->|JWT Access Token| U
+    U -->|Bearer Token + Account ID| A[Account API]
+    A --> J[JWT Validation]
+    J -->|Invalid| E401[401 Unauthorized]
+    J -->|Valid| O{Owns Account?}
+    O -->|No| E403[403 Forbidden]
+    O -->|Yes| D[Return Account Data]
+    L --> AU[Audit Logging]
+    A --> AU
+    AU --> AL[Local JSONL Audit Log]
+    U --> AD[Admin Health Endpoint]
+    AD --> R[Authentication and Role Check]
+    R -->|Denied| E403
+    R -->|Allowed| H[Health Response]
 ```
 
-See the architecture documentation for more detail:
+Architecture documentation:
 
 - `architecture/system-context.md`
 - `architecture/data-flow.md`
 - `architecture/securebank-dfd.md`
 
-## Threat Modeling
+## Threat Modeling and Traceability
 
-The project includes:
+The repository contains:
 
-- STRIDE threat analysis
-- Threat register with risk information
-- Authentication threat analysis
-- Security requirements and controls
-- Remediation planning
+- STRIDE analysis and a threat register.
+- Authentication threat analysis.
+- Security requirements and controls.
+- Remediation planning.
+- Threat-to-test traceability.
 
 Key files:
 
 - `threat-model/stride-analysis.md`
 - `threat-model/threat-register.csv`
+- `threat-model/threat-test-traceability.md`
 - `threat-model/authentication-threats.md`
 - `security-requirements/security-controls.md`
 - `mitigations/remediation-plan.md`
+- `mitigations/bola-remediation.md`
+- `tests/security-test-plan.md`
 
-## Security Finding: BOLA
-
-Broken Object Level Authorization occurs when an API fails to verify
-whether the authenticated user is authorized to access a requested object.
-
-In this lab, users have separate account records. The account endpoint
-must verify ownership rather than relying only on successful authentication.
-
-**Remediation:** The API checks account ownership before returning account
-data and denies cross-account access.
-
-See `mitigations/bola-remediation.md` for the documented remediation.
+Threat statuses reflect the evidence currently available. A passing regression test does not establish that every possible attack scenario is mitigated.
 
 ## Security Controls Demonstrated
 
-- JWT signature verification
-- Token expiration validation
-- Issuer and audience validation
-- Rejection of missing or tampered tokens
-- Account-level authorization
-- Rejection of invalid login attempts
-- Automated security regression tests
+### Authentication and authorization
+
+- JWT signature, expiration, issuer, and audience validation.
+- Rejection of missing, invalid, expired, and tampered tokens.
+- Password-hash verification using Werkzeug.
+- Account ownership enforcement to prevent cross-user access.
+- `require_role("admin")` guard on the example admin health endpoint.
+- HTTP 401 for unauthenticated requests and HTTP 403 for authorization denials.
+- Unsupported account modification methods rejected with HTTP 405.
+
+### Denial-of-service safeguards
+
+Flask-Limiter applies per-client-IP limits:
+
+| Endpoint | Limit |
+|---|---:|
+| `POST /api/login` | 5 requests per minute |
+| `GET /api/accounts/<account_id>` | 30 requests per minute |
+| `GET /api/admin/health` | 30 requests per minute |
+
+Excess requests receive HTTP 429. The lab uses in-memory rate-limit storage; production multi-worker deployments need shared storage and additional capacity and abuse testing.
+
+### Audit logging
+
+- Structured JSON Lines audit events.
+- Local persistent audit log.
+- Restrictive file and directory permissions.
+- Hash-chain verification and regression tests for tampering.
+- Filtering of sensitive detail fields.
+
+The local hash chain is not protection against a privileged attacker who can rewrite the entire log and recompute hashes. External log protection, independent integrity checkpoints, and retention controls remain unverified.
 
 ## Technology Stack
 
@@ -86,12 +106,14 @@ See `mitigations/bola-remediation.md` for the documented remediation.
 |---|---|
 | Application | Python, Flask |
 | Authentication | PyJWT, JWT |
+| Rate limiting | Flask-Limiter |
+| Audit logging | Python logging, JSON Lines, SHA-256 hash chain |
 | Testing | pytest |
 | Threat modeling | STRIDE, data-flow diagrams |
-| SAST | Semgrep |
-| Dependency and configuration scanning | Trivy |
+| Static analysis | Semgrep |
+| Dependency scanning | Trivy |
 | Secret scanning | Gitleaks |
-| CI/CD | GitHub Actions |
+| CI | GitHub Actions |
 | Version control | Git, GitHub |
 
 ## Run Locally
@@ -117,95 +139,85 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
-### 4. Generate a lab JWT signing key
+### 4. Configure the lab environment
+
+Generate a temporary JWT signing key:
 
 ```bash
 export JWT_SECRET="$(python -c 'import secrets; print(secrets.token_hex(32))')"
 ```
 
-Generate a fresh key for each new shell session. This example is for
-local testing only; production applications should use managed secret
-storage and appropriate key rotation.
-
-### 5. Run the security regression tests
+Generate demo password hashes without putting plaintext passwords or hashes in source code:
 
 ```bash
-pytest -v
+export USER_A_PASSWORD_HASH="$(python -c 'import getpass; from werkzeug.security import generate_password_hash; print(generate_password_hash(getpass.getpass("Password for user-a: ")))')"
+export USER_B_PASSWORD_HASH="$(python -c 'import getpass; from werkzeug.security import generate_password_hash; print(generate_password_hash(getpass.getpass("Password for user-b: ")))')"
 ```
 
-The local regression suite contains 20 tests covering BOLA authorization,
-JWT validation, password-hash storage, successful and failed login,
-malformed login inputs and Authorization headers, unsupported HTTP methods,
-and unknown-account handling.
+These variables apply to the current shell. Do not commit secrets or generated hashes.
 
-### 6. Configure demo credentials and run the API
+### 5. Run the regression tests
 
-The app requires `JWT_SECRET`, `USER_A_PASSWORD_HASH`, and
-`USER_B_PASSWORD_HASH`. Generate local demo password hashes without
-storing plaintext passwords or hashes in the repository:
+The test module configures test-only password hashes. Set `JWT_SECRET` and run:
 
 ```bash
-export USER_A_PASSWORD_HASH="$(python -c 'import getpass; from werkzeug.security import generate_password_hash; print(generate_password_hash(getpass.getpass("Password for user-a: ")))' )"
-export USER_B_PASSWORD_HASH="$(python -c 'import getpass; from werkzeug.security import generate_password_hash; print(generate_password_hash(getpass.getpass("Password for user-b: ")))' )"
+JWT_SECRET="$(python -c 'import secrets; print(secrets.token_hex(32))')" pytest -v
 ```
 
-Enter a password when prompted for each user. `getpass` hides
-password input in the terminal. These commands set environment variables
-for the current shell; do not commit their values or share them.
+The latest locally verified suite contains **34 passing tests**. It covers authentication and JWT validation, account ownership, malformed login inputs, audit events and integrity, rate limiting, role authorization, and rejection of unsupported account modification methods.
 
-Generate a JWT signing key for the current shell:
+### 6. Start the API
 
-```bash
-export JWT_SECRET="$(python -c 'import secrets; print(secrets.token_hex(32))')"
-```
-
-Start the local demo API:
+Configure `JWT_SECRET`, `USER_A_PASSWORD_HASH`, and `USER_B_PASSWORD_HASH` as described above, then run:
 
 ```bash
 python application/app.py
 ```
 
-The API binds to `127.0.0.1`. These are local lab credentials, not
-a production identity system. Do not commit generated hashes or secrets.
+The application binds to `127.0.0.1:5000`. Use only demo credentials in this lab.
 
 ## Automated Security Checks
 
-The GitHub Actions workflow is located at
-`.github/workflows/security.yml`.
+The workflow is `.github/workflows/security.yml`.
 
-It runs four jobs on pushes and pull requests:
+It contains four jobs:
 
 1. **Security Regression Tests** — runs pytest.
-2. **Semgrep SAST** — scans the application and test code.
-3. **Trivy Security Scan** — scans dependencies, configuration, and secrets.
-4. **Gitleaks Secret Scan** — checks repository Git history for likely secrets.
+2. **Semgrep SAST** — scans application and test code.
+3. **Trivy Security Scan** — scans dependencies, configuration, and secrets as configured by the workflow.
+4. **Gitleaks Secret Scan** — checks Git history for likely secrets.
 
-Latest verified workflow run: all four jobs passed.
+Run the local checks:
+
+```bash
+semgrep scan --config p/python --no-git-ignore --error application/ tests/
+trivy fs --scanners vuln --detection-priority comprehensive .
+gitleaks detect --source . --redact --verbose
+```
+
+Latest locally reported results: 34 tests passed, Semgrep reported zero findings across 151 rules, Trivy detected zero dependency vulnerabilities in `requirements.txt`, and Gitleaks reported no leaks. These results are scoped to the configured tools and scans; they do not prove the absence of all vulnerabilities.
 
 [View GitHub Actions](https://github.com/nikhildudhuke123/threat-modeling-lab/actions)
 
-A passing scan only means that the configured checks completed without
-reported findings. It does not prove the absence of all vulnerabilities.
-
 ## Current Limitations
 
-- This is a small educational API, not a production banking service.
-- Sample user credentials are currently hardcoded in the application.
-- Login rate limiting and production-grade credential storage need further work.
-- Production deployment, key management, monitoring, and broader test coverage
-  are outside the current implementation.
+- This is an educational API, not a production banking service.
+- There is no persistent identity store or admin provisioning workflow.
+- Role authorization is demonstrated on an example health endpoint; future privileged operations need equivalent enforcement and tests.
+- Rate limiting uses in-memory storage and has not been validated against distributed abuse or broad resource exhaustion.
+- Audit logs are stored locally; independent external protection, retention, and resistance to privileged rewriting remain unverified.
+- No account mutation endpoint exists, so protection of future mutation operations still needs testing.
+- Broader operational security, deployment hardening, monitoring, and resilience testing are outside the current scope.
 
 ## Future Improvements
 
-- Replace hardcoded credentials with securely stored password hashes.
-- Add login rate limiting and stronger authentication protections.
-- Expand negative and edge-case authorization tests.
-- Add API security tests and further threat-driven test cases.
-- Pin dependencies and third-party CI actions more rigorously.
-- Add container image scanning and infrastructure-as-code checks.
+- Add independent external audit-log storage and integrity checkpoints.
+- Test rate limiting with shared storage and broader abuse scenarios.
+- Add persistent identity and securely governed admin provisioning.
+- Add mutation endpoints only with explicit authorization and integrity tests.
+- Expand API security, operational resilience, and deployment testing.
+- Pin CI actions and dependencies to stricter reproducible versions where appropriate.
 
 ## Disclaimer
 
-This repository is for educational and defensive security testing.
-Use the techniques only in systems you own or are explicitly authorized
-to assess.
+This repository is for educational and defensive security testing. Use security testing techniques only on systems you own or are explicitly authorized to assess.

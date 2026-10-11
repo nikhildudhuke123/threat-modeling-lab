@@ -5,6 +5,7 @@ from functools import wraps
 import jwt
 from flask import Flask, jsonify, request
 from werkzeug.security import check_password_hash
+from audit import audit_event
 
 app = Flask(__name__)
 
@@ -56,6 +57,7 @@ def require_authentication(handler):
         scheme, _, token = auth_header.partition(" ")
 
         if scheme.lower() != "bearer" or not token:
+            audit_event("authentication_rejected", "failure", path=request.path, method=request.method)
             return jsonify({"error": "Unauthorized"}), 401
 
         try:
@@ -68,11 +70,13 @@ def require_authentication(handler):
                 options={"require": ["sub", "iat", "exp", "iss", "aud"]},
             )
         except (jwt.InvalidTokenError, ValueError):
+            audit_event("authentication_rejected", "failure", path=request.path, method=request.method)
             return jsonify({"error": "Unauthorized"}), 401
 
         username = claims.get("sub")
 
         if username not in USERS:
+            audit_event("authentication_rejected", "failure", path=request.path, method=request.method)
             return jsonify({"error": "Unauthorized"}), 401
 
         request.authenticated_user = username
@@ -86,19 +90,23 @@ def login():
     data = request.get_json(silent=True)
 
     if not isinstance(data, dict):
+        audit_event("login_attempt", "failure", username="invalid")
         return jsonify({"error": "Invalid credentials"}), 401
 
     username = data.get("username")
     password = data.get("password")
 
     if not isinstance(username, str) or not isinstance(password, str):
+        audit_event("login_attempt", "failure", username=username if isinstance(username, str) else "invalid")
         return jsonify({"error": "Invalid credentials"}), 401
 
     user = USERS.get(username)
 
     if not user or not check_password_hash(user["password_hash"], password):
+        audit_event("login_attempt", "failure", username=username)
         return jsonify({"error": "Invalid credentials"}), 401
 
+    audit_event("login_attempt", "success", username=username)
     return jsonify({"access_token": create_token(username)}), 200
 
 
@@ -109,12 +117,15 @@ def get_account(account_id):
     account = ACCOUNTS.get(account_id)
 
     if account is None:
+        audit_event("account_access", "not_found", username=username, account_id=account_id)
         return jsonify({"error": "Account not found"}), 404
 
     # Object-level authorization: authentication alone is not enough.
     if account["owner"] != username:
+        audit_event("account_access", "denied", username=username, account_id=account_id)
         return jsonify({"error": "Forbidden"}), 403
 
+    audit_event("account_access", "success", username=username, account_id=account_id)
     return jsonify({
         "account_id": account_id,
         "owner": account["owner"],

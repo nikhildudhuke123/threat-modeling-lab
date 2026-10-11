@@ -263,3 +263,107 @@ def test_unknown_account_returns_404():
 
     assert response.status_code == 404
     assert response.get_json()["error"] == "Account not found"
+
+
+def test_successful_login_is_audited_without_credentials(caplog):
+    import json
+    import logging
+
+    with caplog.at_level(logging.INFO, logger="securebank.audit"):
+        response = app.test_client().post(
+            "/api/login",
+            json={"username": "user-a", "password": "LabPass-A-Only"},
+        )
+
+    assert response.status_code == 200
+    records = [
+        json.loads(record.message)
+        for record in caplog.records
+        if record.name == "securebank.audit"
+    ]
+    assert any(
+        record["event"] == "login_attempt"
+        and record["outcome"] == "success"
+        and record["username"] == "user-a"
+        for record in records
+    )
+    logged_text = "\n".join(record.message for record in caplog.records)
+    assert "LabPass-A-Only" not in logged_text
+    assert response.get_json()["access_token"] not in logged_text
+
+
+def test_failed_login_is_audited(caplog):
+    import json
+    import logging
+
+    with caplog.at_level(logging.INFO, logger="securebank.audit"):
+        response = app.test_client().post(
+            "/api/login",
+            json={"username": "user-a", "password": "wrong-password"},
+        )
+
+    assert response.status_code == 401
+    records = [
+        json.loads(record.message)
+        for record in caplog.records
+        if record.name == "securebank.audit"
+    ]
+    assert any(
+        record["event"] == "login_attempt"
+        and record["outcome"] == "failure"
+        and record["username"] == "user-a"
+        for record in records
+    )
+    assert "wrong-password" not in "\n".join(
+        record.message for record in caplog.records
+    )
+
+
+def test_cross_account_access_is_audited(caplog):
+    import json
+    import logging
+
+    token = create_token("user-a")
+    with caplog.at_level(logging.INFO, logger="securebank.audit"):
+        response = app.test_client().get(
+            "/api/accounts/202",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert response.status_code == 403
+    records = [
+        json.loads(record.message)
+        for record in caplog.records
+        if record.name == "securebank.audit"
+    ]
+    assert any(
+        record["event"] == "account_access"
+        and record["outcome"] == "denied"
+        and record["username"] == "user-a"
+        and record["account_id"] == 202
+        for record in records
+    )
+    assert token not in "\n".join(
+        record.message for record in caplog.records
+    )
+
+
+def test_missing_token_rejection_is_audited(caplog):
+    import json
+    import logging
+
+    with caplog.at_level(logging.INFO, logger="securebank.audit"):
+        response = app.test_client().get("/api/accounts/101")
+
+    assert response.status_code == 401
+    records = [
+        json.loads(record.message)
+        for record in caplog.records
+        if record.name == "securebank.audit"
+    ]
+    assert any(
+        record["event"] == "authentication_rejected"
+        and record["outcome"] == "failure"
+        and record["path"] == "/api/accounts/101"
+        for record in records
+    )

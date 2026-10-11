@@ -218,6 +218,16 @@ Latest locally reported results: 35 tests passed, Semgrep reported zero findings
 - Expand API security, operational resilience, and deployment testing.
 - Pin CI actions and dependencies to stricter reproducible versions where appropriate.
 
+## Security Assessment Report
+
+Read the [SecureBank Threat Modeling & Security Assessment Report](reports/SecureBank_Threat_Modeling_Security_Assessment_Report.pdf).
+
+The report covers:
+- STRIDE threat analysis
+- Security controls and mitigations
+- Regression testing and CI security checks
+- Residual risks and recommended improvements
+
 ## Disclaimer
 
 This repository is for educational and defensive security testing. Use security testing techniques only on systems you own or are explicitly authorized to assess.

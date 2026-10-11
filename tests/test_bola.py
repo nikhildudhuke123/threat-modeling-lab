@@ -239,3 +239,15 @@ def test_malformed_authorization_header_is_rejected():
         )
 
         assert response.status_code == 401
+
+
+def test_post_to_get_only_account_endpoint_is_rejected():
+    token = create_token("user-a")
+
+    response = app.test_client().post(
+        "/api/accounts/101",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"balance": 999999},
+    )
+
+    assert response.status_code == 405
